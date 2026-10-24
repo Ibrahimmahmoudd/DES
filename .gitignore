@@ -1,0 +1,10 @@
+.vs/
+.idea/
+*.vcxproj.user
+build/
+out/
+bin/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+cmake-build-*/
