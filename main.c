@@ -8,6 +8,11 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#define DES_ROUNDS 16
+#define DES_BLOCK_BITS 64
+#define DES_HALF_BITS 28
+#define DES_SUBKEY_BITS 48
+#define HALF_MASK 0x0FFFFFFF
 
 const int Initial_Permutation []=  {	58, 50, 42, 34, 26, 18, 10, 2,
 										60, 52, 44, 36, 28, 20, 12, 4,
@@ -105,7 +110,94 @@ const int Permutation_Box [] = {16,  7, 20, 21,
 								32, 27,  3,  9,
 								19, 13, 30,  6,
 								22, 11,  4, 25 };
+uint64_t permute_bits(
+    uint64_t input,
+    int inputBits,
+    const int *table,
+    int outputBits
+)
+{
+    uint64_t output = 0;
+
+    for (int i = 0; i < outputBits; i++) {
+        int shift = inputBits - table[i];
+        uint64_t bit = (input >> shift) & 1ULL;
+
+        output = (output << 1) | bit;
+    }
+
+    return output;
+}
+
+/*
+ * Circular left shift of a 28-bit DES key half.
+ */
+uint32_t circular_left_shift(uint32_t value, int shifts)
+{
+    value &= HALF_MASK;
+
+    return ((value << shifts) |
+            (value >> (DES_HALF_BITS - shifts)))
+            & HALF_MASK;
+}
+
+/*
+ * Generates all 16 DES round keys.
+ *
+ * key:
+ *     Original DES key represented by 8 raw bytes.
+ *
+ * roundKeys:
+ *     Array of 16 uint64_t values.
+ *     Each value contains a 48-bit subkey.
+ */
+void generate_subkeys(
+    const unsigned char key[8],
+    uint64_t roundKeys[DES_ROUNDS]
+)
+{
+    uint64_t originalKey = 0;
+
+    /* Step 1: Convert the 8 key bytes into 64 bits. */
+    for (int i = 0; i < 8; i++) {
+        originalKey = (originalKey << 8) | key[i];
+    }
+
+    /* Step 2: Apply PC-1: 64 bits -> 56 bits. */
+    uint64_t permutedKey = permute_bits(
+        originalKey,
+        64,
+        Permuted_Choice_1,
+        56
+    );
+
+    /* Step 3: Split the 56-bit result into two 28-bit halves. */
+    uint32_t C = (uint32_t)((permutedKey >> 28) & HALF_MASK);
+    uint32_t D = (uint32_t)(permutedKey & HALF_MASK);
+
+    /* Step 4: Generate all 16 round keys. */
+    for (int round = 0; round < DES_ROUNDS; round++) {
+
+        int shifts = key_shift_sizes[round + 1];
+
+        /* Step 5: Circularly rotate both halves. */
+        C = circular_left_shift(C, shifts);
+        D = circular_left_shift(D, shifts);
+
+        /* Step 6: Combine C and D into 56 bits. */
+        uint64_t combinedKey =
+            ((uint64_t)C << 28) | D;
+
+        /* Step 7: Apply PC-2: 56 bits -> 48 bits. */
+        roundKeys[round] = permute_bits(
+            combinedKey,
+            56,
+            Permuted_Choice_2,
+            48
+        );
+    }
+}
 int main(int argc, char **argv)
 {
-    return 0;
+ return 0;
 }
