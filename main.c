@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #define DES_ROUNDS 16
 #define DES_BLOCK_BITS 64
 #define DES_HALF_BITS 28
@@ -197,6 +198,28 @@ void generate_subkeys(
         );
     }
 }
+/*
+  The Feistel Function: takes 32-bit Right half and 48-bit subkey
+ */
+uint32_t feistel_function(uint32_t R, uint64_t subkey)
+{
+	uint64_t expanded_R = permute_bits(R,32,Expansion_Permutation,48);  // expand 32-bit to 48-bit
+	uint64_t xor_result = expanded_R ^ subkey;	// xor with subkey
+	uint32_t sbox_output = 0;
+	const int* S_Boxes[8] = {S1,S2,S3,S4,S5,S6,S7,S8};
+	// S-Boxes logic
+	for (int i = 0; i < 8; i++) {
+		int shift = 42 - (i * 6);
+		uint8_t block = (xor_result >> shift) & 0x3F;	// isolate each 6-bit chunk
+		uint8_t row = ((block & 0x20) >> 4) | (block & 0x01);
+		uint8_t col = (block & 0x1E) >> 1;
+		uint32_t s_val = S_Boxes[i][row * 16 + col];    // fetch from S-box
+		sbox_output |= (s_val << (28 - (i * 4)));	    // shift into the 32-bit output
+	}
+	// final P-Box permutation
+	return (uint32_t)permute_bits(sbox_output, 32, Permutation_Box, 32);
+}
+
 int main(int argc, char **argv)
 {
  return 0;
