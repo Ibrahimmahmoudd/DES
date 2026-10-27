@@ -219,8 +219,48 @@ uint32_t feistel_function(uint32_t R, uint64_t subkey)
 	// final P-Box permutation
 	return (uint32_t)permute_bits(sbox_output, 32, Permutation_Box, 32);
 }
+/*
+ Processes a single 64-bit block through DES (mode: 1 for Encrypt, 0 for Decrypt)
+ */
+uint64_t process_des_block(uint64_t block, uint64_t roundKeys[DES_ROUNDS], int mode) {
 
+}
 int main(int argc, char **argv)
 {
+
+	if (argc != 5) return 1;	// invalid number of arguments
+	int mode = (strcmp(argv[1], "encrypt") == 0) ? 1 : 0;
+	FILE *key_file = fopen(argv[2], "rb");
+	FILE *input_file = fopen(argv[3], "rb");
+	FILE *output_file = fopen(argv[4], "wb");
+	if (!key_file || !input_file || !output_file) return 1;
+
+	unsigned char raw_key[8];
+	fread(raw_key, 1, 8, key_file);	// read keys
+	fclose(key_file);
+
+	uint64_t roundKeys[DES_ROUNDS];
+	generate_subkeys(raw_key, roundKeys);	// generate subkeys
+
+	unsigned char buffer[8];
+	size_t bytes_read;
+
+	while ((bytes_read = fread(buffer, 1, 8, input_file)) == 8) {
+		uint64_t block = 0;
+		// Big-Endian read
+		for (int i = 0; i < 8; i++) block = (block << 8) | buffer[i];
+		uint64_t processed_block = process_des_block(block, roundKeys, mode);
+		// Big-Endian write
+		unsigned char out_buffer[8];
+		for (int i = 7; i >= 0; i--) {
+			out_buffer[i] = processed_block & 0xFF;
+			processed_block >>= 8;
+		}
+		fwrite(out_buffer, 1, 8, output_file);
+	}
+
+	fclose(input_file);
+	fclose(output_file);
+
  return 0;
 }
