@@ -223,7 +223,20 @@ uint32_t feistel_function(uint32_t R, uint64_t subkey)
  Processes a single 64-bit block through DES (mode: 1 for Encrypt, 0 for Decrypt)
  */
 uint64_t process_des_block(uint64_t block, uint64_t roundKeys[DES_ROUNDS], int mode) {
+block = permute_bits(block, 64, Initial_Permutation, 64);
+    uint32_t L = (uint32_t)(block >> 32);
+    uint32_t R = (uint32_t)(block & 0xFFFFFFFF);
 
+    for (int round = 0; round < DES_ROUNDS; round++) {
+        int key_index = (mode == 1) ? round : (DES_ROUNDS - 1 - round);
+        uint32_t next_L = R;
+        uint32_t next_R = L ^ feistel_function(R, roundKeys[key_index]);
+        L = next_L;
+        R = next_R;
+    }
+
+    uint64_t pre_output = ((uint64_t)R << 32) | (uint64_t)L;
+    return permute_bits(pre_output, 64, Inverse_Initial_Permutation, 64);
 }
 int main(int argc, char **argv)
 {
